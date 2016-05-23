@@ -12,7 +12,7 @@ Library nbd
   CompiledObject: best
   Path: lib
   Modules: S, Protocol, Result, Client, Channel, Server, Mux, Mirror
-  BuildDepends: cstruct, cstruct.ppx, sexplib, ppx_sexp_conv, lwt, mirage-types.lwt, io-page
+  BuildDepends: cstruct, cstruct.ppx, sexplib, ppx_sexp_conv, lwt, mirage-types.lwt, mirage-block, io-page
 
 Library "nbd-lwt"
   CompiledObject: best

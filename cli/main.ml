@@ -225,6 +225,7 @@ let mirror common filename port secondary =
         let channel = Nbd_lwt_unix.of_fd fd in
         Server.connect channel ()
         >>= fun (name, t) ->
+        Printf.printf "Connected OK\n%!";
         Server.serve t (module M) m in
       loop () in
     loop () in

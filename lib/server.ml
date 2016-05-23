@@ -108,6 +108,7 @@ let negotiate_end t  size flags : t Lwt.t =
   return { channel = t.channel; request = t.request; reply = t.reply; m = t.m }
 
 let next t =
+  Printf.printf "Waiting for next request\n%!";
   t.channel.read t.request
   >>= fun () ->
   match Request.unmarshal t.request with
@@ -118,10 +119,13 @@ let ok t handle payload =
   Lwt_mutex.with_lock t.m
     (fun () ->
        Reply.marshal t.reply { Reply.handle; error = `Ok () };
+       Printf.printf "Replying\n%!";
        t.channel.write t.reply
        >>= fun () ->
        match payload with
-       | None -> return ()
+       | None ->
+         Printf.printf "No payload\n%!";
+         return ()
        | Some data -> t.channel.write data
     )
 
@@ -150,26 +154,39 @@ let serve t (type t) block (b:t) =
     let open Request in
     match request with
     | { ty = Command.Write; from; len; handle } ->
+      Printf.printf "Got write\n%!";
       if Int64.(rem from (of_int info.Block.sector_size)) <> 0L || Int64.(rem (of_int32 len) (of_int info.Block.sector_size) <> 0L)
-      then error t handle `EINVAL
-      else begin
+      then begin
+        Printf.printf "EINVAL: fst rem=%Ld snd rem=%Ld\n%!" Int64.(rem from (of_int info.Block.sector_size)) Int64.(rem (of_int32 len) (of_int info.Block.sector_size));
+        error t handle `EINVAL
+      end else begin
         let rec copy offset remaining =
+          Printf.printf "In copy\n%!";
           let n = min block_size remaining in
           let subblock = Cstruct.sub block 0 n in
           t.channel.Channel.read subblock
           >>= fun () ->
+          Printf.printf "Got data (size=%d)\n%!" (Cstruct.len subblock);
           Block.write b Int64.(div offset (of_int info.Block.sector_size)) [ subblock ]
           >>= function
           | `Error e ->
+            Printf.printf "EIO: e=%s" (Mirage_block_error.string_of_error e);
             error t handle `EIO
           | `Ok () ->
             let remaining = remaining - n in
             if remaining > 0
-            then copy Int64.(add offset (of_int n)) remaining
-            else ok t handle None in
+            then begin
+              Printf.printf "Ok: remaining=%d\n%!" remaining;
+              copy Int64.(add offset (of_int n)) remaining
+            end else begin
+              Printf.printf "Ok: no remaining\n%!";
+              ok t handle None
+            end in
         copy from (Int32.to_int request.Request.len)
       end
+      >>= loop
     | { ty = Command.Read; from; len; handle } ->
+      Printf.printf "Got read\n%!";
       if Int64.(rem from (of_int info.Block.sector_size)) <> 0L || Int64.(rem (of_int32 len) (of_int info.Block.sector_size) <> 0L)
       then error t handle `EINVAL
       else begin
@@ -192,5 +209,6 @@ let serve t (type t) block (b:t) =
         copy from (Int32.to_int request.Request.len)
       end
     | _ ->
+      Printf.printf "Got something odd\n%!";
       error t request.Request.handle `EINVAL in
   loop ()

@@ -278,13 +278,20 @@ module Make(Primary: V1_LWT.BLOCK)(Secondary: V1_LWT.BLOCK) = struct
     let length = total_length_bytes / t.info.sector_size in
     let primary_ofs = Int64.(mul ofs (of_int t.primary_block_size)) in
     let secondary_ofs = Int64.(mul ofs (of_int t.secondary_block_size)) in
+    Printf.printf "Got write request\n%!";
     Region_lock.with_lock t.lock ofs length
       (fun () ->
+         Printf.printf "Writing primary\n%!";
          Primary.write t.primary primary_ofs bufs
-         >>= function
-         | `Error e -> return (`Error e)
+         >>= (function
+         | `Error e ->
+           return (`Error e)
          | `Ok () ->
-           Secondary.write t.secondary secondary_ofs bufs
+           Printf.printf "Writing secondary\n%!";
+           Secondary.write t.secondary secondary_ofs bufs)
+         >>= fun e ->
+         Printf.printf "Completed\n%!";
+         return e
       )
 
   let disconnect t =
