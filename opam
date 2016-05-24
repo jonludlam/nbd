@@ -33,6 +33,7 @@ depends: [
   "cmdliner"
   "sexplib"
   "mirage-block-unix"
+  "mirage-block"
   "io-page"
   "mirage"
   "uri"
